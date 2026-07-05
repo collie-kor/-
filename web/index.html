@@ -27,9 +27,24 @@
   </svg>
 
   <div id="app">
-    <!-- ===== 홈 화면 ===== -->
-    <section id="screen-home" class="screen home active">
+    <!-- ===== 진입 화면 (모드 선택) ===== -->
+    <section id="screen-entry" class="screen entry active">
       <div class="logo">✎ 연필 타임랩스</div>
+      <div class="char-wrap">
+        <img src="assets/pencil_1h.png" alt="연필 캐릭터" />
+      </div>
+      <div class="entry-buttons">
+        <button id="btn-mode-solo" class="doodle-btn primary">혼자하기</button>
+        <button id="btn-mode-friends" class="doodle-btn ghost">친구와 함께하기</button>
+      </div>
+      <div class="entry-note sub-text">혼자하기는 로그인 없이 바로 시작해요</div>
+    </section>
+
+    <!-- ===== 홈 화면 ===== -->
+    <section id="screen-home" class="screen home">
+      <div class="topbar">
+        <button id="btn-home-back" class="back-btn">‹ 모드</button>
+      </div>
 
       <div class="char-wrap">
         <img id="home-char" src="assets/pencil_1h.png" alt="연필 캐릭터" />
@@ -47,6 +62,9 @@
       </div>
 
       <button id="btn-start" class="doodle-btn primary start-btn">공부 시작</button>
+
+      <!-- 광고 배너 자리 (네이티브 AdMob. 광고 제거 구매 시 사라짐) -->
+      <div class="ad-banner" aria-hidden="true">광고 영역 · 배너</div>
     </section>
 
     <!-- ===== 촬영 화면 ===== -->
@@ -55,15 +73,19 @@
       <div class="overlay-ui">
         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
           <div class="rec-row">
-            <span class="rec-dot"></span>
-            <span class="rec-label">REC</span>
+            <span class="rec-dot" id="rec-dot"></span>
+            <span class="rec-label" id="rec-label">REC</span>
           </div>
           <select id="demo-speed" class="demo-speed hidden" title="공부 시간 흐름 속도">
             <option value="1" selected>실시간</option>
           </select>
         </div>
         <div class="bottom-row">
-          <button id="btn-stop" class="stop-btn" aria-label="정지"></button>
+          <div class="capture-controls">
+            <button id="btn-pause" class="ctrl-btn" aria-label="일시정지">❚❚</button>
+            <button id="btn-stop" class="stop-btn" aria-label="정지"></button>
+            <span class="ctrl-spacer"></span>
+          </div>
         </div>
       </div>
     </section>

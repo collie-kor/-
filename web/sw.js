@@ -1,5 +1,5 @@
 /* 서비스워커 — 오프라인 지원(앱 셸 캐시). 버전 올리면 캐시 갱신됨. */
-var CACHE = 'pencil-timelapse-v1';
+var CACHE = 'pencil-timelapse-v2';
 var ASSETS = [
   '.',
   'index.html',

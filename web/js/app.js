@@ -8,10 +8,12 @@
 
   // ---------- DOM ----------
   var screens = {
+    entry: document.getElementById('screen-entry'),
     home: document.getElementById('screen-home'),
     capture: document.getElementById('screen-capture'),
     result: document.getElementById('screen-result')
   };
+  var captureScreen = document.getElementById('screen-capture');
   var capCanvas = document.getElementById('cap-canvas');
   var cctx = capCanvas.getContext('2d');
   var demoSpeedSel = document.getElementById('demo-speed');
@@ -23,14 +25,16 @@
   var video = null;           // <video> for camera
   var noCamera = false;
   var running = false;
-  var studySeconds = 0;       // 누적 공부 시간(초, 데모 배속 반영)
+  var paused = false;         // 일시정지 (타이머·프레임 캡처 정지)
+  var studySeconds = 0;       // 실제 공부 누적 시간(초, 일시정지 제외)
   var lastTs = 0;
   var rafId = 0;
-  var frames = [];            // 타임랩스용 캡처된 ImageBitmap 배열
+  var frames = [];            // 타임랩스용 캡처된 ImageBitmap 배열 (쉬는 구간 제외)
   var lastCaptureTs = 0;
   var CAPTURE_INTERVAL_MS = 400;
-  var FRAME_W = 405;          // 타임랩스 프레임 가로 (세로는 9:16)
+  var FRAME_W = 405;          // 타임랩스 프레임 가로 (촬영 시작 시 방향에 맞춰 설정)
   var FRAME_H = 720;
+  var captureLandscape = false; // 촬영 시작 순간 감지해 고정하는 방향
   var lastVideoBlobUrl = null;
 
   // ---------- 유틸 ----------
@@ -190,34 +194,38 @@
       ctx.fillText('카메라 없음 · 데모 모드', W / 2, H * 0.42);
     }
 
+    // 크기 기준: 방향과 무관하게 짧은 변 기준으로 잡아 세로/가로 모두 일관되게
+    var base = Math.min(W, H);
+
     // 2) 상단 공부 타이머 (영상에 함께 구움)
     var timer = C.formatHMS(secs);
     ctx.save();
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.font = '700 ' + Math.round(W * 0.085) + "px Gaegu, sans-serif";
-    ctx.lineWidth = Math.max(3, W * 0.012);
+    ctx.font = '700 ' + Math.round(base * 0.09) + "px Gaegu, sans-serif";
+    ctx.lineWidth = Math.max(3, base * 0.013);
     ctx.strokeStyle = 'rgba(250,247,239,0.85)';
-    ctx.strokeText(timer, W / 2, H * 0.035);
+    ctx.strokeText(timer, W / 2, base * 0.035);
     ctx.fillStyle = '#2B2B2B';
-    ctx.fillText(timer, W / 2, H * 0.035);
+    ctx.fillText(timer, W / 2, base * 0.035);
     ctx.restore();
 
-    // 3) 캐릭터 (우하단, 살짝 통통)
+    // 3) 캐릭터 (우하단 구석, 살짝 통통) — 세로/가로 모두 구석 배치
     var stage = C.stageForSeconds(secs);
     var img = charImgs[stage];
-    var bob = Math.sin(animPhase * 2.2) * (H * 0.008);
-    var chH = H * 0.30;
+    var bob = Math.sin(animPhase * 2.2) * (base * 0.008);
+    var chH = base * 0.34;
     var chW = img && img.width ? chH * (img.width / img.height) : chH * 0.9;
-    var chX = W - chW - W * 0.05;
-    var chY = H - chH - H * 0.05 + bob;
+    var margin = base * 0.05;
+    var chX = W - chW - margin;
+    var chY = H - chH - margin + bob;
     if (img && img.complete && img.naturalWidth) {
       ctx.drawImage(img, chX, chY, chW, chH);
     }
 
     // 4) 말풍선 (캐릭터 위)
     var line = C.lineForSeconds(secs);
-    var bubbleScale = W / 405;
-    drawSpeechBubble(ctx, chX + chW / 2, chX + chW * 0.4, chY - H * 0.01,
+    var bubbleScale = base / 405;
+    drawSpeechBubble(ctx, chX + chW / 2, chX + chW * 0.4, chY - base * 0.01,
       timer, line, bubbleScale);
   }
 
@@ -254,19 +262,29 @@
     if (!lastTs) lastTs = ts;
     var dt = (ts - lastTs) / 1000;
     lastTs = ts;
-    var scale = parseFloat(demoSpeedSel.value) || 1;
-    studySeconds += dt * scale;
+
+    if (!paused) {
+      var scale = parseFloat(demoSpeedSel.value) || 1;
+      studySeconds += dt * scale;   // 일시정지 중에는 누적하지 않음
+    }
 
     sizeCanvasToDisplay(capCanvas);
     var W = capCanvas.width, H = capCanvas.height;
     drawScene(cctx, W, H, makeCoverDraw(), studySeconds, ts / 1000);
 
-    // 타임랩스 프레임 캡처
-    if (ts - lastCaptureTs >= CAPTURE_INTERVAL_MS) {
+    // 타임랩스 프레임 캡처 (일시정지 구간은 캡처 안 함 → 영상에서 자연히 이어붙음)
+    if (!paused && ts - lastCaptureTs >= CAPTURE_INTERVAL_MS) {
       lastCaptureTs = ts;
       captureFrame();
     }
     rafId = requestAnimationFrame(loop);
+  }
+
+  function togglePause() {
+    paused = !paused;
+    captureScreen.classList.toggle('paused', paused);
+    document.getElementById('rec-label').textContent = paused ? '일시정지' : 'REC';
+    document.getElementById('btn-pause').textContent = paused ? '▶' : '❚❚';
   }
 
   // 현재 장면을 프레임 캔버스에 다운스케일해 저장
@@ -312,6 +330,17 @@
   // ---------- 세션 시작/정지 ----------
   function beginSession() {
     studySeconds = 0; frames = []; lastTs = 0; lastCaptureTs = 0; noCamera = false;
+    paused = false;
+    captureScreen.classList.remove('paused');
+    document.getElementById('rec-label').textContent = 'REC';
+    document.getElementById('btn-pause').textContent = '❚❚';
+
+    // 촬영 시작 순간의 방향 감지 후 고정 (중간에 폰 돌려도 영상 방향 불변)
+    captureLandscape = window.innerWidth > window.innerHeight;
+    if (captureLandscape) { FRAME_W = 720; FRAME_H = 405; }
+    else { FRAME_W = 405; FRAME_H = 720; }
+    frameCanvas.width = FRAME_W; frameCanvas.height = FRAME_H;
+
     show('capture');
     startCamera().then(function () {
       running = true;
@@ -421,7 +450,19 @@
   }
 
   // ---------- 이벤트 ----------
+  // 진입(모드 선택)
+  document.getElementById('btn-mode-solo').addEventListener('click', function () {
+    renderHomeStats(); show('home');
+  });
+  document.getElementById('btn-mode-friends').addEventListener('click', function () {
+    toast('친구와 함께하기는 2차 업데이트에서 열려요 (서버 연동)');
+  });
+  document.getElementById('btn-home-back').addEventListener('click', function () {
+    show('entry');
+  });
+
   document.getElementById('btn-start').addEventListener('click', beginSession);
+  document.getElementById('btn-pause').addEventListener('click', togglePause);
   document.getElementById('btn-stop').addEventListener('click', endSession);
   document.getElementById('btn-back').addEventListener('click', function () {
     renderHomeStats(); show('home');
