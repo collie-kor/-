@@ -1,0 +1,11 @@
+# OS / editor
+Thumbs.db
+.DS_Store
+*.swp
+
+# Python cache (tools/)
+__pycache__/
+*.pyc
+
+# 임시/체크용 산출물
+web/assets/_*.png

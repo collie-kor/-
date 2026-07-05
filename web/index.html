@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#FAF7EF" />
+  <title>연필 타임랩스 — 공부 타임랩스</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Nanum+Pen+Script&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <!-- 손그림 흔들림 SVG 필터 (두들링 테두리) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <filter id="wobble">
+      <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="3" seed="7" result="noise" />
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="3.2" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+  </svg>
+
+  <div id="app">
+    <!-- ===== 홈 화면 ===== -->
+    <section id="screen-home" class="screen home active">
+      <div class="logo">✎ 연필 타임랩스</div>
+
+      <div class="char-wrap">
+        <img id="home-char" src="assets/pencil_1h.png" alt="연필 캐릭터" />
+      </div>
+
+      <div class="stats">
+        <div class="stat doodle-box">
+          <div class="label">오늘 공부</div>
+          <div class="value" id="stat-today">00:00:00</div>
+        </div>
+        <div class="stat doodle-box">
+          <div class="label">연속</div>
+          <div class="value" id="stat-streak">0일</div>
+        </div>
+      </div>
+
+      <button id="btn-start" class="doodle-btn primary start-btn">공부 시작</button>
+    </section>
+
+    <!-- ===== 촬영 화면 ===== -->
+    <section id="screen-capture" class="screen capture">
+      <canvas id="cap-canvas"></canvas>
+      <div class="overlay-ui">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div class="rec-row">
+            <span class="rec-dot"></span>
+            <span class="rec-label">REC</span>
+          </div>
+          <select id="demo-speed" class="demo-speed hidden" title="공부 시간 흐름 속도">
+            <option value="1" selected>실시간</option>
+          </select>
+        </div>
+        <div class="bottom-row">
+          <button id="btn-stop" class="stop-btn" aria-label="정지"></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 결과 화면 ===== -->
+    <section id="screen-result" class="screen result">
+      <div class="topbar">
+        <button id="btn-back" class="back-btn">‹ 홈</button>
+      </div>
+      <div class="card-title">오늘의 공부 기록</div>
+
+      <div class="result-card doodle-box">
+        <video id="result-video" playsinline autoplay loop muted controls></video>
+        <div class="summary">
+          <div class="big" id="result-total">00:00:00</div>
+          <div class="final-state" id="result-state">—</div>
+          <div class="final-line" id="result-line">—</div>
+        </div>
+      </div>
+
+      <div class="result-actions">
+        <button id="btn-save" class="doodle-btn">갤러리 저장</button>
+        <button id="btn-share" class="doodle-btn primary">공유</button>
+      </div>
+      <button id="btn-again" class="again">다시 찍기</button>
+    </section>
+  </div>
+
+  <div id="toast"></div>
+
+  <script src="js/character.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
