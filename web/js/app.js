@@ -39,10 +39,15 @@
 
   // ---------- 유틸 ----------
   function show(name) {
-    Object.keys(screens).forEach(function (k) {
-      screens[k].classList.toggle('active', k === name);
-    });
+    // 모든 .screen 을 대상으로 (친구 모드 화면 포함)
+    var all = document.querySelectorAll('.screen');
+    for (var i = 0; i < all.length; i++) {
+      all[i].classList.toggle('active', all[i].id === 'screen-' + name);
+    }
   }
+  window.showScreen = show;
+
+  var lastSessionInfo = null;  // 결과(친구 피드 업로드)용 마지막 세션 정보
   function toast(msg) {
     var t = document.getElementById('toast');
     t.textContent = msg; t.classList.add('show');
@@ -365,6 +370,19 @@
     homeChar.src = C.imagePath(1);
     renderHomeStats();
 
+    // 친구 피드 업로드용 세션 정보 기록
+    lastSessionInfo = {
+      seconds: finalSec,
+      stage: stage,
+      line: C.lineForSeconds(finalSec),
+      date: (function () {
+        var d = new Date();
+        var p = function (n) { return (n < 10 ? '0' : '') + n; };
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+      })()
+    };
+    if (window.Friends && window.Friends.onResultReady) window.Friends.onResultReady();
+
     show('result');
     buildTimelapse();
   }
@@ -455,7 +473,8 @@
     renderHomeStats(); show('home');
   });
   document.getElementById('btn-mode-friends').addEventListener('click', function () {
-    toast('친구와 함께하기는 2차 업데이트에서 열려요 (서버 연동)');
+    if (window.Friends && window.Friends.enter) window.Friends.enter();
+    else toast('친구 기능 로딩 중이에요');
   });
   document.getElementById('btn-home-back').addEventListener('click', function () {
     show('entry');
@@ -470,6 +489,14 @@
   document.getElementById('btn-again').addEventListener('click', beginSession);
   document.getElementById('btn-save').addEventListener('click', saveVideo);
   document.getElementById('btn-share').addEventListener('click', shareVideo);
+
+  // 친구 모듈에서 쓰는 최소 API
+  window.App = {
+    show: show,
+    toast: toast,
+    getTimelapseBlob: function () { return window._lastTimelapseBlob || null; },
+    getLastSession: function () { return lastSessionInfo; }
+  };
 
   // ---------- 초기화 ----------
   renderHomeStats();

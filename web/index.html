@@ -110,7 +110,47 @@
         <button id="btn-save" class="doodle-btn">갤러리 저장</button>
         <button id="btn-share" class="doodle-btn primary">공유</button>
       </div>
+      <button id="btn-feed-upload" class="doodle-btn hidden" style="width:100%;margin-top:12px;">친구 피드에 올리기</button>
       <button id="btn-again" class="again">다시 찍기</button>
+    </section>
+
+    <!-- ===== 로그인 화면 (친구 모드) ===== -->
+    <section id="screen-login" class="screen login">
+      <div class="topbar">
+        <button class="back-btn" data-go="entry">‹ 모드</button>
+      </div>
+      <div class="char-wrap">
+        <img src="assets/pencil_4h.png" alt="연필 캐릭터" />
+      </div>
+      <div class="login-box">
+        <div class="hand-title" style="text-align:center;margin-bottom:8px;">친구와 함께하기</div>
+        <p class="sub-text" style="text-align:center;">친구 그룹에 로그인해서<br/>서로의 공부 타임랩스를 봐요</p>
+        <button id="btn-google" class="doodle-btn primary" style="width:100%;margin-top:16px;">구글로 로그인</button>
+      </div>
+    </section>
+
+    <!-- ===== 그룹 화면 (친구 모드) ===== -->
+    <section id="screen-groups" class="screen groups">
+      <div class="topbar">
+        <button class="back-btn" data-go="entry">‹ 모드</button>
+        <button id="btn-logout" class="back-btn" style="margin-left:auto;">로그아웃</button>
+      </div>
+      <div class="card-title" style="text-align:center;">내 친구 그룹</div>
+      <div id="group-list" class="group-list"></div>
+      <div class="group-actions">
+        <button id="btn-create-group" class="doodle-btn primary">＋ 새 그룹 만들기</button>
+        <button id="btn-join-group" class="doodle-btn">초대 코드로 참여</button>
+      </div>
+    </section>
+
+    <!-- ===== 피드 화면 (친구 모드) ===== -->
+    <section id="screen-feed" class="screen feed">
+      <div class="topbar">
+        <button class="back-btn" data-go="groups">‹ 그룹</button>
+        <span id="feed-group-name" class="feed-title"></span>
+        <button id="btn-invite" class="back-btn" style="margin-left:auto;">초대링크</button>
+      </div>
+      <div id="feed-list" class="feed-list"></div>
     </section>
   </div>
 
@@ -118,6 +158,9 @@
 
   <script src="js/character.js"></script>
   <script src="js/app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.0/dist/umd/supabase.js"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/friends.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {
