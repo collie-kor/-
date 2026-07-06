@@ -1,5 +1,5 @@
 /* 서비스워커 — 오프라인 지원(앱 셸 캐시). 버전 올리면 캐시 갱신됨. */
-var CACHE = 'pencil-timelapse-v7';
+var CACHE = 'pencil-timelapse-v8';
 var ASSETS = [
   '.',
   'index.html',
@@ -37,20 +37,23 @@ self.addEventListener('activate', function (e) {
   );
 });
 
+// 네트워크 우선: 온라인이면 항상 최신 코드, 오프라인이면 캐시 폴백.
+// (동일 출처만 처리. 크로스 출처 — Supabase API, CDN — 는 브라우저에 맡김)
 self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
+  var url = new URL(e.request.url);
+  if (url.origin !== self.location.origin) return;
   e.respondWith(
-    caches.match(e.request).then(function (hit) {
-      return hit || fetch(e.request).then(function (res) {
-        // 동일 출처 GET만 런타임 캐시
-        try {
-          if (res && res.status === 200 && e.request.url.indexOf(self.location.origin) === 0) {
-            var copy = res.clone();
-            caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
-          }
-        } catch (err) {}
-        return res;
-      }).catch(function () { return caches.match('index.html'); });
+    fetch(e.request).then(function (res) {
+      if (res && res.status === 200) {
+        var copy = res.clone();
+        caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
+      }
+      return res;
+    }).catch(function () {
+      return caches.match(e.request).then(function (hit) {
+        return hit || caches.match('index.html');
+      });
     })
   );
 });
