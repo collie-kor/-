@@ -95,6 +95,24 @@
     });
   }
 
+  function confirm(opts) {
+    opts = opts || {};
+    return new Promise(function (resolve) {
+      ensure(); clear();
+      titleEl.textContent = opts.title || '';
+      if (opts.message) {
+        var m = document.createElement('div'); m.className = 'modal-msg';
+        m.innerHTML = opts.message; bodyEl.appendChild(m);
+      }
+      var cancel = button(opts.cancelText || '취소', 'ghost');
+      var ok = button(opts.confirmText || '확인', opts.danger ? 'danger' : 'primary');
+      cancel.onclick = function () { close(); resolve(false); };
+      ok.onclick = function () { close(); resolve(true); };
+      actionsEl.appendChild(cancel); actionsEl.appendChild(ok);
+      open();
+    });
+  }
+
   function choose(opts) {
     opts = opts || {};
     return new Promise(function (resolve) {
@@ -113,5 +131,5 @@
     });
   }
 
-  window.Modal = { input: input, alert: alert, copy: copy, choose: choose, close: close };
+  window.Modal = { input: input, alert: alert, copy: copy, confirm: confirm, choose: choose, close: close };
 })();

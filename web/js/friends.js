@@ -74,7 +74,7 @@
 
   // ---------- 그룹 ----------
   function loadGroups() {
-    return client().from('groups').select('id,name,invite_code')
+    return client().from('groups').select('id,name,invite_code,created_by')
       .order('created_at', { ascending: true })
       .then(function (r) { return r.error ? [] : (r.data || []); });
   }
@@ -152,7 +152,49 @@
     currentGroup = group;
     show('feed');
     document.getElementById('feed-group-name').textContent = group.name;
+    // 삭제 버튼은 생성자에게만
+    var del = document.getElementById('btn-delete-group');
+    var myId = session && session.user && session.user.id;
+    if (group.created_by && group.created_by === myId) del.classList.remove('hidden');
+    else del.classList.add('hidden');
     renderFeed();
+  }
+
+  function leaveGroup() {
+    if (!currentGroup) return;
+    Modal.confirm({
+      title: '그룹 나가기',
+      message: '"' + esc(currentGroup.name) + '" 그룹에서 나갈까요?<br/>내가 올린 기록은 그룹에 남아요.',
+      confirmText: '나가기', danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      client().from('group_members').delete()
+        .eq('group_id', currentGroup.id).eq('user_id', session.user.id)
+        .then(function (r) {
+          if (r.error) { toast('나가기 오류: ' + r.error.message); return; }
+          toast('그룹에서 나왔어요');
+          currentGroup = null;
+          openGroups();
+        });
+    });
+  }
+
+  function deleteGroup() {
+    if (!currentGroup) return;
+    Modal.confirm({
+      title: '그룹 삭제',
+      message: '"' + esc(currentGroup.name) + '" 그룹을 삭제할까요?<br/>모든 멤버의 기록·영상이 사라지고 되돌릴 수 없어요.',
+      confirmText: '삭제', danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      client().from('groups').delete().eq('id', currentGroup.id)
+        .then(function (r) {
+          if (r.error) { toast('삭제 오류: ' + r.error.message); return; }
+          toast('그룹을 삭제했어요');
+          currentGroup = null;
+          openGroups();
+        });
+    });
   }
 
   function renderFeed() {
@@ -344,6 +386,8 @@
     document.getElementById('btn-create-group').addEventListener('click', createGroup);
     document.getElementById('btn-join-group').addEventListener('click', joinGroupPrompt);
     document.getElementById('btn-invite').addEventListener('click', copyInvite);
+    document.getElementById('btn-leave-group').addEventListener('click', leaveGroup);
+    document.getElementById('btn-delete-group').addEventListener('click', deleteGroup);
     document.getElementById('btn-feed-upload').addEventListener('click', uploadToFeed);
     document.getElementById('btn-friends-feed').addEventListener('click', function () {
       if (!session) { show('login'); return; }
