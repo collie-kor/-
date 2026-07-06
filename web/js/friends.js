@@ -376,24 +376,59 @@
 
   function doUpload(target, blob, info) {
     var btn = document.getElementById('btn-feed-upload');
+    var C = window.PencilCharacter;
     btn.disabled = true; btn.textContent = '올리는 중…';
-    var postId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
-      : (Date.now() + '-' + Math.floor(Math.random() * 1e9));
-    var path = target.id + '/' + postId + '.webm';
-    client().storage.from('feed-videos').upload(path, blob, { contentType: 'video/webm', upsert: true })
-      .then(function (up) {
-        if (up.error) throw up.error;
-        return client().from('posts').insert({
-          id: postId, group_id: target.id, study_date: info.date,
-          study_seconds: info.seconds, final_stage: info.stage,
-          final_line: info.line, video_url: path
+    var c = client();
+
+    // 같은 날, 같은 그룹의 내 기록이 이미 있는지 확인 (하루 한 장)
+    c.from('posts')
+      .select('id,study_seconds,video_url')
+      .eq('group_id', target.id).eq('author_id', session.user.id).eq('study_date', info.date)
+      .maybeSingle()
+      .then(function (r) {
+        if (r.error) throw r.error;
+        var existing = r.data;
+        var added = false, total, path, ok;
+
+        if (existing) {
+          // 그날 공부 시간 누적 + 최신 영상으로 갱신
+          added = true;
+          total = (existing.study_seconds || 0) + info.seconds;
+          path = existing.video_url || (target.id + '/' + existing.id + '.webm');
+          ok = c.storage.from('feed-videos').upload(path, blob, { contentType: 'video/webm', upsert: true })
+            .then(function (up) {
+              if (up.error) throw up.error;
+              return c.from('posts').update({
+                study_seconds: total,
+                final_stage: C.stageForSeconds(total),
+                final_line: C.lineForSeconds(total),
+                video_url: path,
+                created_at: new Date().toISOString()
+              }).eq('id', existing.id);
+            });
+        } else {
+          // 그날 첫 기록: 새 게시물
+          total = info.seconds;
+          var postId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+            : (Date.now() + '-' + Math.floor(Math.random() * 1e9));
+          path = target.id + '/' + postId + '.webm';
+          ok = c.storage.from('feed-videos').upload(path, blob, { contentType: 'video/webm', upsert: true })
+            .then(function (up) {
+              if (up.error) throw up.error;
+              return c.from('posts').insert({
+                id: postId, group_id: target.id, study_date: info.date,
+                study_seconds: total, final_stage: C.stageForSeconds(total),
+                final_line: C.lineForSeconds(total), video_url: path
+              });
+            });
+        }
+
+        return ok.then(function (res) {
+          if (res.error) throw res.error;
+          toast(added ? '오늘 기록에 더했어요! (총 ' + C.formatHMS(total) + ')' : '친구 피드에 올렸어요!');
+          btn.disabled = false; btn.textContent = '피드에서 보기';
+          btn.onclick = function () { openFeed(target); };
         });
-      })
-      .then(function (ins) {
-        if (ins.error) throw ins.error;
-        toast('친구 피드에 올렸어요!');
-        btn.disabled = false; btn.textContent = '피드에서 보기';
-        btn.onclick = function () { openFeed(target); };
       })
       .catch(function (e) {
         toast('업로드 오류: ' + (e.message || e));
