@@ -312,22 +312,32 @@
   function deletePost(p) {
     Modal.confirm({
       title: '기록 삭제',
-      message: '이 공부 기록과 영상을 삭제할까요?<br/>되돌릴 수 없어요.',
+      message: '이 공부 기록을 삭제할까요?<br/>되돌릴 수 없어요.',
       confirmText: '삭제', danger: true
     }).then(function (ok) {
       if (!ok) return;
-      var c = client();
-      // 스토리지 영상 먼저 정리(있으면) 후 게시물 삭제
-      var pre = p.video_url
-        ? c.storage.from('feed-videos').remove([p.video_url])
-        : Promise.resolve({});
-      pre.then(function () { return c.from('posts').delete().eq('id', p.id); })
-        .then(function (r) {
-          if (r.error) { toast('삭제 오류: ' + r.error.message); return; }
+      var path = p.video_url;
+      // 게시물 먼저 삭제 → 그 영상을 참조하는 게시물이 하나도 안 남았을 때만 스토리지 삭제
+      client().from('posts').delete().eq('id', p.id).then(function (r) {
+        if (r.error) { toast('삭제 오류: ' + r.error.message); return; }
+        maybeDeleteOrphanVideo(path).then(function () {
           toast('기록을 삭제했어요');
           renderFeed();
         });
+      });
     });
+  }
+
+  // 이 영상 경로를 참조하는 게시물이 하나도 없으면 스토리지에서 실제 삭제
+  // (같은 영상을 그룹 2개에 올렸다가 하나만 지운 경우엔 남겨둠 → 공간 안전)
+  function maybeDeleteOrphanVideo(path) {
+    if (!path) return Promise.resolve();
+    return client().from('posts').select('id').eq('video_url', path).limit(1)
+      .then(function (r) {
+        if (!r.error && (!r.data || r.data.length === 0)) {
+          return client().storage.from('feed-videos').remove([path]).then(function () {});
+        }
+      });
   }
 
   function toggleStamp(postId, stamp, mine) {
@@ -374,61 +384,69 @@
     });
   }
 
+  var uploadedThisSession = {};   // videoId -> true (같은 촬영을 여러 그룹에 올릴 때 재업로드 방지)
+
   function doUpload(target, blob, info) {
     var btn = document.getElementById('btn-feed-upload');
     var C = window.PencilCharacter;
-    btn.disabled = true; btn.textContent = '올리는 중…';
     var c = client();
+    var uid = session.user.id;
+    // 촬영 1건 = 파일 1개. 여러 그룹에 올려도 같은 경로(공유).
+    var path = uid + '/' + info.videoId + '.webm';
+    btn.disabled = true; btn.textContent = '올리는 중…';
 
-    // 같은 날, 같은 그룹의 내 기록이 이미 있는지 확인 (하루 한 장)
+    function ensureUploaded() {
+      if (uploadedThisSession[info.videoId]) return Promise.resolve();
+      return c.storage.from('feed-videos').upload(path, blob, { contentType: 'video/webm', upsert: true })
+        .then(function (up) {
+          if (up.error) throw up.error;
+          uploadedThisSession[info.videoId] = true;
+        });
+    }
+
+    // 같은 날, 같은 그룹의 내 기록이 있는지 (하루 한 장)
     c.from('posts')
       .select('id,study_seconds,video_url')
-      .eq('group_id', target.id).eq('author_id', session.user.id).eq('study_date', info.date)
+      .eq('group_id', target.id).eq('author_id', uid).eq('study_date', info.date)
       .maybeSingle()
       .then(function (r) {
         if (r.error) throw r.error;
         var existing = r.data;
-        var added = false, total, path, ok;
-
-        if (existing) {
-          // 그날 공부 시간 누적 + 최신 영상으로 갱신
-          added = true;
-          total = (existing.study_seconds || 0) + info.seconds;
-          path = existing.video_url || (target.id + '/' + existing.id + '.webm');
-          ok = c.storage.from('feed-videos').upload(path, blob, { contentType: 'video/webm', upsert: true })
-            .then(function (up) {
-              if (up.error) throw up.error;
-              return c.from('posts').update({
-                study_seconds: total,
-                final_stage: C.stageForSeconds(total),
-                final_line: C.lineForSeconds(total),
-                video_url: path,
-                created_at: new Date().toISOString()
-              }).eq('id', existing.id);
+        return ensureUploaded().then(function () {
+          if (existing) {
+            // 그날 공부시간 누적 + 최신 영상으로 갱신
+            var total = (existing.study_seconds || 0) + info.seconds;
+            var oldPath = existing.video_url;
+            return c.from('posts').update({
+              study_seconds: total,
+              final_stage: C.stageForSeconds(total),
+              final_line: C.lineForSeconds(total),
+              video_url: path,
+              created_at: new Date().toISOString()
+            }).eq('id', existing.id).then(function (res) {
+              if (res.error) throw res.error;
+              // 이전 영상이 다른 게시물에서도 안 쓰이면 정리
+              var cleanup = (oldPath && oldPath !== path) ? maybeDeleteOrphanVideo(oldPath) : Promise.resolve();
+              return cleanup.then(function () { return { added: true, total: total }; });
             });
-        } else {
+          }
           // 그날 첫 기록: 새 게시물
-          total = info.seconds;
           var postId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
             : (Date.now() + '-' + Math.floor(Math.random() * 1e9));
-          path = target.id + '/' + postId + '.webm';
-          ok = c.storage.from('feed-videos').upload(path, blob, { contentType: 'video/webm', upsert: true })
-            .then(function (up) {
-              if (up.error) throw up.error;
-              return c.from('posts').insert({
-                id: postId, group_id: target.id, study_date: info.date,
-                study_seconds: total, final_stage: C.stageForSeconds(total),
-                final_line: C.lineForSeconds(total), video_url: path
-              });
-            });
-        }
-
-        return ok.then(function (res) {
-          if (res.error) throw res.error;
-          toast(added ? '오늘 기록에 더했어요! (총 ' + C.formatHMS(total) + ')' : '친구 피드에 올렸어요!');
-          btn.disabled = false; btn.textContent = '피드에서 보기';
-          btn.onclick = function () { openFeed(target); };
+          return c.from('posts').insert({
+            id: postId, group_id: target.id, study_date: info.date,
+            study_seconds: info.seconds, final_stage: C.stageForSeconds(info.seconds),
+            final_line: C.lineForSeconds(info.seconds), video_url: path
+          }).then(function (res) {
+            if (res.error) throw res.error;
+            return { added: false, total: info.seconds };
+          });
         });
+      })
+      .then(function (out) {
+        toast(out.added ? '오늘 기록에 더했어요! (총 ' + C.formatHMS(out.total) + ')' : '친구 피드에 올렸어요!');
+        btn.disabled = false; btn.textContent = '피드에서 보기';
+        btn.onclick = function () { openFeed(target); };
       })
       .catch(function (e) {
         toast('업로드 오류: ' + (e.message || e));

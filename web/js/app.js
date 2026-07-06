@@ -31,7 +31,11 @@
   var rafId = 0;
   var frames = [];            // 타임랩스용 캡처된 ImageBitmap 배열 (쉬는 구간 제외)
   var lastCaptureTs = 0;
-  var CAPTURE_INTERVAL_MS = 400;
+  // 타임랩스 배속: 실시간 60배 (공부 1시간 → 영상 1분). 3시간 → 3분.
+  var TIMELAPSE_SPEEDUP = 60;
+  var OUT_FPS = 30;
+  // 캡처 간격 = 1000 * 배속 / 출력FPS  → 재생 시 정확히 60배 압축
+  var CAPTURE_INTERVAL_MS = Math.round(1000 * TIMELAPSE_SPEEDUP / OUT_FPS); // 2000ms
   var FRAME_W = 405;          // 타임랩스 프레임 가로 (촬영 시작 시 방향에 맞춰 설정)
   var FRAME_H = 720;
   var captureLandscape = false; // 촬영 시작 순간 감지해 고정하는 방향
@@ -371,10 +375,13 @@
     renderHomeStats();
 
     // 친구 피드 업로드용 세션 정보 기록
+    // videoId: 이 촬영 1건의 고유 id → 여러 그룹에 올려도 스토리지 파일은 1개(공유)
     lastSessionInfo = {
       seconds: finalSec,
       stage: stage,
       line: C.lineForSeconds(finalSec),
+      videoId: (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+        : (Date.now() + '-' + Math.floor(Math.random() * 1e9)),
       date: (function () {
         var d = new Date();
         var p = function (n) { return (n < 10 ? '0' : '') + n; };
@@ -429,12 +436,12 @@
     };
 
     var track = stream.getVideoTracks()[0];
-    var fps = 18, delay = 1000 / fps, i = 0;
+    var delay = 1000 / OUT_FPS, i = 0;   // 캡처 간격과 맞물려 정확히 60배속
     rec.start();
     (function step() {
       if (i >= frames.length) {
-        // 마지막 프레임 잠깐 유지 후 종료
-        setTimeout(function () { try { rec.stop(); } catch (e) {} }, 500);
+        // 마지막 프레임 잠깐 유지 후 종료 (짧게)
+        setTimeout(function () { try { rec.stop(); } catch (e) {} }, 150);
         return;
       }
       octx.drawImage(frames[i], 0, 0, out.width, out.height);
