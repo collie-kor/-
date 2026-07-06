@@ -250,13 +250,29 @@
     if (p.video_url) {
       afterVideo = client().storage.from('feed-videos').createSignedUrl(p.video_url, 3600)
         .then(function (s) {
-          if (s.data && s.data.signedUrl) {
-            var v = document.createElement('video');
-            v.src = s.data.signedUrl;
-            v.playsInline = true; v.loop = true; v.muted = true; v.controls = true;
-            v.className = 'feed-video';
-            card.appendChild(v);
+          if (s.error || !s.data || !s.data.signedUrl) {
+            var note = document.createElement('div');
+            note.className = 'feed-line sub-text';
+            note.textContent = '⚠ 영상을 불러올 수 없어요';
+            card.appendChild(note);
+            if (s.error) console.error('[feed] signed url error', s.error);
+            return;
           }
+          var v = document.createElement('video');
+          // 결과 화면과 동일하게 자동재생(무음) — webm 자동재생 트리거
+          v.setAttribute('playsinline', '');
+          v.setAttribute('muted', '');
+          v.muted = true;
+          v.autoplay = true;
+          v.loop = true;
+          v.controls = true;
+          v.preload = 'auto';
+          v.className = 'feed-video';
+          v.onerror = function () { console.error('[feed] video error', p.video_url); };
+          v.src = s.data.signedUrl;
+          card.appendChild(v);
+          var play = v.play();
+          if (play && play.catch) play.catch(function () { /* 사용자 제스처 필요 시 무시 */ });
         });
     }
 
@@ -277,8 +293,40 @@
         b.addEventListener('click', function () { toggleStamp(p.id, s.k, mine); });
         bar.appendChild(b);
       });
+      // 내가 올린 기록이면 삭제 버튼
+      if (p.author_id && p.author_id === myId) {
+        var spacer = document.createElement('span');
+        spacer.style.flex = '1';
+        bar.appendChild(spacer);
+        var del = document.createElement('button');
+        del.className = 'post-del';
+        del.textContent = '🗑 삭제';
+        del.addEventListener('click', function () { deletePost(p); });
+        bar.appendChild(del);
+      }
       card.appendChild(bar);
       return card;
+    });
+  }
+
+  function deletePost(p) {
+    Modal.confirm({
+      title: '기록 삭제',
+      message: '이 공부 기록과 영상을 삭제할까요?<br/>되돌릴 수 없어요.',
+      confirmText: '삭제', danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      var c = client();
+      // 스토리지 영상 먼저 정리(있으면) 후 게시물 삭제
+      var pre = p.video_url
+        ? c.storage.from('feed-videos').remove([p.video_url])
+        : Promise.resolve({});
+      pre.then(function () { return c.from('posts').delete().eq('id', p.id); })
+        .then(function (r) {
+          if (r.error) { toast('삭제 오류: ' + r.error.message); return; }
+          toast('기록을 삭제했어요');
+          renderFeed();
+        });
     });
   }
 
