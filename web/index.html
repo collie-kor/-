@@ -62,6 +62,7 @@
       </div>
 
       <button id="btn-start" class="doodle-btn primary start-btn">공부 시작</button>
+      <button id="btn-friends-feed" class="doodle-btn ghost hidden" style="width:100%;margin-bottom:10px;">친구 피드 보기</button>
 
       <!-- 광고 배너 자리 (네이티브 AdMob. 광고 제거 구매 시 사라짐) -->
       <div class="ad-banner" aria-hidden="true">광고 영역 · 배너</div>
@@ -132,7 +133,7 @@
     <!-- ===== 그룹 화면 (친구 모드) ===== -->
     <section id="screen-groups" class="screen groups">
       <div class="topbar">
-        <button class="back-btn" data-go="entry">‹ 모드</button>
+        <button class="back-btn" data-go="home">‹ 홈</button>
         <button id="btn-logout" class="back-btn" style="margin-left:auto;">로그아웃</button>
       </div>
       <div class="card-title" style="text-align:center;">내 친구 그룹</div>
@@ -154,12 +155,22 @@
     </section>
   </div>
 
+  <!-- 인앱 모달 (두들링) -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal doodle-box">
+      <div id="modal-title" class="modal-title"></div>
+      <div id="modal-body" class="modal-body"></div>
+      <div id="modal-actions" class="modal-actions"></div>
+    </div>
+  </div>
+
   <div id="toast"></div>
 
   <script src="js/character.js"></script>
   <script src="js/app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.0/dist/umd/supabase.js"></script>
   <script src="js/supabase-config.js"></script>
+  <script src="js/modal.js"></script>
   <script src="js/friends.js"></script>
   <script>
     if ('serviceWorker' in navigator) {

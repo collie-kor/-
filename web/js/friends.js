@@ -52,9 +52,24 @@
     var chain = Promise.resolve();
     if (pendingJoin) {
       var code = pendingJoin; pendingJoin = null;
-      chain = doJoin(code);
+      chain = doJoin(code).then(function (g) { if (g) currentGroup = g; });
     }
-    chain.then(openGroups);
+    chain.then(function () {
+      // 로그인 후 홈으로 (홈에서 바로 공부 시작 + 친구 피드 이동)
+      if (window.App && window.App.goHome) window.App.goHome();
+      else show('home');
+      updateHome();
+      // 초대링크로 들어온 경우엔 바로 그 그룹 피드로
+      if (currentGroup) openFeed(currentGroup);
+    });
+  }
+
+  // 홈의 "친구 피드" 버튼 노출 (로그인 상태에서만)
+  function updateHome() {
+    var b = document.getElementById('btn-friends-feed');
+    if (!b) return;
+    if (session) b.classList.remove('hidden');
+    else b.classList.add('hidden');
   }
 
   // ---------- 그룹 ----------
@@ -84,26 +99,52 @@
   }
 
   function createGroup() {
-    var name = prompt('그룹 이름을 정해주세요 (예: 고3 스터디)');
-    if (!name || !name.trim()) return;
-    client().rpc('create_group', { group_name: name.trim() }).then(function (r) {
-      if (r.error) { toast('생성 오류: ' + r.error.message); return; }
-      toast('그룹을 만들었어요');
-      openGroups();
+    Modal.input({
+      title: '새 그룹 만들기',
+      placeholder: '그룹 이름 (예: 고3 스터디)',
+      confirmText: '만들기'
+    }).then(function (name) {
+      if (!name) return;
+      client().rpc('create_group', { group_name: name }).then(function (r) {
+        if (r.error) { toast('생성 오류: ' + r.error.message); return; }
+        var g = r.data;
+        var link = inviteLink(g.invite_code);
+        Modal.copy({
+          title: '그룹을 만들었어요!',
+          message: '이 초대 링크를 받은 친구만 들어올 수 있어요',
+          value: link
+        }).then(openGroups);
+      });
     });
   }
 
+  // 초대 코드 또는 링크에서 코드만 추출
+  function parseCode(raw) {
+    raw = (raw || '').trim();
+    var m = raw.match(/[?&]join=([^&\s]+)/);
+    return m ? decodeURIComponent(m[1]) : raw;
+  }
+  function inviteLink(code) {
+    return location.origin + location.pathname + '?join=' + code;
+  }
+
   function doJoin(code) {
-    return client().rpc('join_group', { p_code: code.trim() }).then(function (r) {
+    return client().rpc('join_group', { p_code: parseCode(code) }).then(function (r) {
       if (r.error) { toast('참여 오류: 코드를 확인해주세요'); return null; }
       toast('그룹에 참여했어요');
       return r.data;
     });
   }
   function joinGroupPrompt() {
-    var code = prompt('초대 코드를 붙여넣어 주세요');
-    if (!code) return;
-    doJoin(code).then(function (g) { if (g) openGroups(); });
+    Modal.input({
+      title: '초대 코드로 참여',
+      message: '친구가 보낸 초대 코드나 링크를 붙여넣으세요',
+      placeholder: '초대 코드 또는 링크',
+      confirmText: '참여'
+    }).then(function (code) {
+      if (!code) return;
+      doJoin(code).then(function (g) { if (g) openGroups(); });
+    });
   }
 
   // ---------- 피드 ----------
@@ -228,17 +269,18 @@
     if (!blob || !info) { toast('영상이 아직 준비 중이에요'); return; }
 
     loadGroups().then(function (groups) {
-      if (!groups.length) { toast('먼저 그룹을 만들어주세요'); openGroups(); return; }
-      var target;
-      if (groups.length === 1) target = groups[0];
-      else {
-        var names = groups.map(function (g, i) { return (i + 1) + '. ' + g.name; }).join('\n');
-        var pick = prompt('어느 그룹에 올릴까요?\n' + names + '\n번호 입력:');
-        var idx = parseInt(pick, 10) - 1;
-        if (isNaN(idx) || !groups[idx]) return;
-        target = groups[idx];
+      if (!groups.length) {
+        toast('먼저 그룹을 만들어주세요'); openGroups(); return;
       }
-      doUpload(target, blob, info);
+      if (groups.length === 1) { doUpload(groups[0], blob, info); return; }
+      Modal.choose({
+        title: '어느 그룹에 올릴까요?',
+        items: groups.map(function (g) { return { label: g.name, value: g.id }; })
+      }).then(function (gid) {
+        if (!gid) return;
+        var target = groups.filter(function (g) { return g.id === gid; })[0];
+        if (target) doUpload(target, blob, info);
+      });
     });
   }
 
@@ -288,14 +330,11 @@
 
   function copyInvite() {
     if (!currentGroup) return;
-    var link = location.origin + location.pathname + '?join=' + currentGroup.invite_code;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(link)
-        .then(function () { toast('초대 링크를 복사했어요'); })
-        .catch(function () { prompt('초대 링크 (복사하세요):', link); });
-    } else {
-      prompt('초대 링크 (복사하세요):', link);
-    }
+    Modal.copy({
+      title: '초대 링크',
+      message: '이 링크를 받은 친구만 이 그룹에 들어올 수 있어요',
+      value: inviteLink(currentGroup.invite_code)
+    });
   }
 
   // ---------- 이벤트/초기화 ----------
@@ -306,10 +345,18 @@
     document.getElementById('btn-join-group').addEventListener('click', joinGroupPrompt);
     document.getElementById('btn-invite').addEventListener('click', copyInvite);
     document.getElementById('btn-feed-upload').addEventListener('click', uploadToFeed);
+    document.getElementById('btn-friends-feed').addEventListener('click', function () {
+      if (!session) { show('login'); return; }
+      openGroups();
+    });
     var gos = document.querySelectorAll('[data-go]');
     for (var i = 0; i < gos.length; i++) {
       (function (el) {
-        el.addEventListener('click', function () { show(el.getAttribute('data-go')); });
+        el.addEventListener('click', function () {
+          var t = el.getAttribute('data-go');
+          if (t === 'home' && window.App && window.App.goHome) window.App.goHome();
+          else show(t);
+        });
       })(gos[i]);
     }
   }
@@ -324,10 +371,12 @@
     if (c) {
       c.auth.getSession().then(function (res) {
         session = res.data.session;
+        updateHome();
         if (session && (pendingJoin || params.get('friends') === '1')) afterLogin();
       });
       c.auth.onAuthStateChange(function (_evt, s) {
         session = s;
+        updateHome();
         if (!s) {
           var btn = document.getElementById('btn-feed-upload');
           if (btn) btn.classList.add('hidden');
@@ -336,7 +385,7 @@
     }
   }
 
-  window.Friends = { enter: enter, onResultReady: onResultReady };
+  window.Friends = { enter: enter, onResultReady: onResultReady, updateHome: updateHome };
   if (document.readyState !== 'loading') init();
   else document.addEventListener('DOMContentLoaded', init);
 })();

@@ -309,6 +309,32 @@ body::before {
 .stamp.on { background: rgba(244,169,169,0.35); }
 .stamp:active { transform: scale(0.95); }
 
+/* ---------- 인앱 모달 ---------- */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(43,43,43,0.35);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.modal {
+  width: 100%; max-width: 360px;
+  background: var(--paper);
+  padding: 22px 20px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.modal-title { font-size: 26px; font-weight: 700; text-align: center; }
+.modal-body { display: flex; flex-direction: column; gap: 10px; }
+.modal-msg { font-size: 18px; color: var(--sub); text-align: center; line-height: 1.5; }
+.modal-input {
+  width: 100%; font-family: inherit; font-size: 20px; color: var(--ink);
+  background: rgba(255,255,255,0.6);
+  border: 2.5px solid var(--ink); border-radius: 14px;
+  padding: 12px 14px; outline: none;
+  filter: url(#wobble);
+}
+.modal-actions { display: flex; gap: 10px; }
+.modal-actions .doodle-btn { flex: 1; font-size: 20px; padding: 12px; text-align: center; }
+
 /* 토스트 (저장/공유 안내) */
 #toast {
   position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%);

@@ -1,5 +1,5 @@
 /* 서비스워커 — 오프라인 지원(앱 셸 캐시). 버전 올리면 캐시 갱신됨. */
-var CACHE = 'pencil-timelapse-v3';
+var CACHE = 'pencil-timelapse-v4';
 var ASSETS = [
   '.',
   'index.html',
@@ -7,6 +7,7 @@ var ASSETS = [
   'js/character.js',
   'js/app.js',
   'js/supabase-config.js',
+  'js/modal.js',
   'js/friends.js',
   'manifest.webmanifest',
   'assets/pencil_1h.png', 'assets/pencil_2h.png', 'assets/pencil_3h.png',

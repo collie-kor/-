@@ -494,6 +494,11 @@
   window.App = {
     show: show,
     toast: toast,
+    goHome: function () {
+      renderHomeStats();
+      show('home');
+      if (window.Friends && window.Friends.updateHome) window.Friends.updateHome();
+    },
     getTimelapseBlob: function () { return window._lastTimelapseBlob || null; },
     getLastSession: function () { return lastSessionInfo; }
   };
